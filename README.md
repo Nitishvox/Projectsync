@@ -89,7 +89,7 @@ PORT=3000
 ### 4. Database Setup
 1. Log in to your [Supabase Dashboard](https://supabase.com/dashboard).
 2. Select your project and navigate to the **SQL Editor**.
-3. Open the schema file [momentum-supabase-schema-v2.sql](file:///d:/sync_connect/momentum-supabase-schema-v2.sql).
+3. Open the schema file [supabase-schema.sql](file:///d:/sync_connect/supabase-schema.sql).
 4. Copy and paste the contents into the SQL Editor and click **Run**.
 5. This script provisions:
    - Tables: `profiles`, `projects`, `tasks`, `chat_messages`, `audit_logs`
@@ -183,7 +183,7 @@ sync_connect/
 │   └── services/
 │       ├── api.ts                  # Axios HTTP client with auth token interceptors
 │       └── supabaseClient.ts       # Supabase JavaScript client initialization
-├── momentum-supabase-schema-v2.sql # Supabase PostgreSQL migration script (tables, RLS, triggers, views)
+├── supabase-schema.sql             # Supabase PostgreSQL migration script (tables, RLS, triggers, views)
 ├── docs/
 │   ├── API.md                      # Comprehensive REST API specifications and payload documentation
 │   └── DATABASE.md                 # Detailed PostgreSQL schema, ER diagram, and RLS documentation

@@ -40,7 +40,7 @@ Key architectural highlights:
 - **Trigger-Driven Synchronization:** Automatic provisioning of user profile records on account registration and automatic tracking of row-level modification timestamps (`updated_at`).
 - **High-Performance Analytics:** Pre-aggregated views configured with `security_invoker = true` to allow instant dashboard metric computation while respecting caller security boundaries.
 
-The database source definition is maintained in [supabase-schema.sql](file:///d:/sync_connect/supabase-schema.sql) (also mirrored in [momentum-supabase-schema-v2.sql](file:///d:/sync_connect/momentum-supabase-schema-v2.sql)).
+The database source definition is maintained in [supabase-schema.sql](file:///d:/sync_connect/supabase-schema.sql).
 
 ---
 
