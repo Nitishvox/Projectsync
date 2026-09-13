@@ -1,4 +1,6 @@
 ﻿-- =========================================================
+
+begin;
 -- ProjectSync — Complete Database Fix & Missing Tables Setup
 -- Run this in your Supabase SQL Editor (Dashboard -> SQL Editor -> New Query)
 -- =========================================================
@@ -52,7 +54,8 @@ create table if not exists public.projects (
   user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
-  constraint valid_date_range check (end_date is null or start_date is null or end_date >= start_date)
+  constraint valid_date_range check (end_date is null or start_date is null or end_date >= start_date),
+  constraint projects_id_user_id_key unique (id, user_id)
 );
 create index if not exists idx_projects_status on public.projects(status);
 create index if not exists idx_projects_user_id on public.projects(user_id);
@@ -60,7 +63,7 @@ create index if not exists idx_projects_user_id on public.projects(user_id);
 -- 7. Ensure TASKS table exists and has proper indexes
 create table if not exists public.tasks (
   id uuid primary key default gen_random_uuid(),
-  project_id uuid not null references public.projects(id) on delete cascade,
+  project_id uuid not null,
   name text not null check (char_length(trim(name)) > 0),
   description text,
   priority text not null default 'MEDIUM' check (priority in ('LOW', 'MEDIUM', 'HIGH')),
@@ -68,12 +71,26 @@ create table if not exists public.tasks (
   due_date timestamptz,
   user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  constraint tasks_project_owner_fkey
+    foreign key (project_id, user_id)
+    references public.projects(id, user_id)
+    on delete cascade
 );
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'projects_id_user_id_key' and conrelid = 'public.projects'::regclass) then
+    alter table public.projects add constraint projects_id_user_id_key unique (id, user_id);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'tasks_project_owner_fkey' and conrelid = 'public.tasks'::regclass) then
+    alter table public.tasks add constraint tasks_project_owner_fkey foreign key (project_id, user_id) references public.projects(id, user_id) on delete cascade;
+  end if;
+end;
+$$;
 create index if not exists idx_tasks_project_id on public.tasks(project_id);
 create index if not exists idx_tasks_status on public.tasks(status);
 create index if not exists idx_tasks_priority on public.tasks(priority);
-create index if not exists idx_tasks_user_id on public.tasks(user_id);
+create index if not exists idx_tasks_user_project on public.tasks(user_id, project_id);
 
 -- 8. Auto-update updated_at triggers
 create or replace function public.set_updated_at()
@@ -141,67 +158,59 @@ alter table public.audit_logs enable row level security;
 -- Profiles RLS
 drop policy if exists "Users can view own profile" on public.profiles;
 create policy "Users can view own profile" on public.profiles
-  for select using (auth.uid() = id or auth.uid() is null);
+  for select to authenticated using (auth.uid() = id);
 
 drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile" on public.profiles
-  for update using (auth.uid() = id or auth.uid() is null);
-
-drop policy if exists "Users can insert own profile" on public.profiles;
-create policy "Users can insert own profile" on public.profiles
-  for insert with check (auth.uid() = id or auth.uid() is null);
+  for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);
 
 -- Projects RLS (allows user or server client with service_role to manage)
 drop policy if exists "Users can view own projects" on public.projects;
 create policy "Users can view own projects" on public.projects
-  for select using (auth.uid() = user_id or auth.uid() is null);
+  for select to authenticated using (auth.uid() = user_id);
 
 drop policy if exists "Users can insert own projects" on public.projects;
 create policy "Users can insert own projects" on public.projects
-  for insert with check (auth.uid() = user_id or auth.uid() is null);
+  for insert to authenticated with check (auth.uid() = user_id);
 
 drop policy if exists "Users can update own projects" on public.projects;
 create policy "Users can update own projects" on public.projects
-  for update using (auth.uid() = user_id or auth.uid() is null) with check (auth.uid() = user_id or auth.uid() is null);
+  for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 drop policy if exists "Users can delete own projects" on public.projects;
 create policy "Users can delete own projects" on public.projects
-  for delete using (auth.uid() = user_id or auth.uid() is null);
+  for delete to authenticated using (auth.uid() = user_id);
 
 -- Tasks RLS
 drop policy if exists "Users can view own tasks" on public.tasks;
 create policy "Users can view own tasks" on public.tasks
-  for select using (auth.uid() = user_id or auth.uid() is null);
+  for select to authenticated using (auth.uid() = user_id);
 
 drop policy if exists "Users can insert own tasks" on public.tasks;
 create policy "Users can insert own tasks" on public.tasks
-  for insert with check (auth.uid() = user_id or auth.uid() is null);
+  for insert to authenticated with check (auth.uid() = user_id);
 
 drop policy if exists "Users can update own tasks" on public.tasks;
 create policy "Users can update own tasks" on public.tasks
-  for update using (auth.uid() = user_id or auth.uid() is null) with check (auth.uid() = user_id or auth.uid() is null);
+  for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 drop policy if exists "Users can delete own tasks" on public.tasks;
 create policy "Users can delete own tasks" on public.tasks
-  for delete using (auth.uid() = user_id or auth.uid() is null);
+  for delete to authenticated using (auth.uid() = user_id);
 
 -- Audit Logs RLS
 drop policy if exists "Users can view own audit logs" on public.audit_logs;
 create policy "Users can view own audit logs" on public.audit_logs
-  for select using (auth.uid() = user_id or auth.uid() is null);
-
-drop policy if exists "Users can insert own audit logs" on public.audit_logs;
-create policy "Users can insert own audit logs" on public.audit_logs
-  for insert with check (auth.uid() = user_id or auth.uid() is null);
+  for select to authenticated using (auth.uid() = user_id);
 
 -- Chat Messages RLS
 drop policy if exists "Users can view own chat messages" on public.chat_messages;
 create policy "Users can view own chat messages" on public.chat_messages
-  for select using (auth.uid() = user_id or auth.uid() is null);
+  for select to authenticated using (auth.uid() = user_id);
 
 drop policy if exists "Users can insert own chat messages" on public.chat_messages;
 create policy "Users can insert own chat messages" on public.chat_messages
-  for insert with check (auth.uid() = user_id or auth.uid() is null);
+  for insert to authenticated with check (auth.uid() = user_id);
 
 -- 12. Create DASHBOARD_STATS view
 create or replace view public.dashboard_stats as
@@ -218,14 +227,25 @@ group by p.user_id;
 
 alter view public.dashboard_stats set (security_invoker = true);
 
--- 13. Grant table permissions to PostgREST roles
-grant all on all tables in schema public to anon, authenticated, service_role;
-grant all on all sequences in schema public to anon, authenticated, service_role;
-grant all on all routines in schema public to anon, authenticated, service_role;
-
-alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
-alter default privileges in schema public grant all on routines to anon, authenticated, service_role;
+-- 13. Grant only the permissions required by the application.
+revoke all on all tables in schema public from anon;
+revoke all on all sequences in schema public from anon;
+revoke all on all routines in schema public from anon;
+grant select, update on public.profiles to authenticated;
+grant select, insert, update, delete on public.projects to authenticated;
+grant select, insert, update, delete on public.tasks to authenticated;
+grant select on public.audit_logs, public.chat_messages, public.dashboard_stats to authenticated;
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+grant all on all routines in schema public to service_role;
+alter default privileges in schema public revoke all on tables from anon;
+alter default privileges in schema public revoke all on sequences from anon;
+alter default privileges in schema public revoke all on functions from anon;
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public grant all on sequences to service_role;
+alter default privileges in schema public grant all on functions to service_role;
 
 -- 14. Reload PostgREST schema cache
 notify pgrst, 'reload schema';
+
+commit;
