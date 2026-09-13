@@ -14,6 +14,8 @@ import { Loader2 } from 'lucide-react';
 // Lazy-loaded route components for optimal bundle splitting
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Projects = lazy(() => import('./pages/Projects'));
 const Tasks = lazy(() => import('./pages/Tasks'));
@@ -35,6 +37,8 @@ export default function App() {
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 
                 <Route element={<ProtectedRoute />}>
                   <Route path="/" element={<Dashboard />} />

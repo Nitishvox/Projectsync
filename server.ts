@@ -518,6 +518,50 @@ app.post('/api/auth/logout', async (req, res) => {
   }
 });
 
+// Forgot Password endpoint – sends a Supabase password reset email
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || 'client';
+    if (!checkIpRateLimit(String(clientIp), 5, 60000)) {
+      return res.status(429).json({
+        success: false,
+        error: 'Too many password reset attempts. Please wait a minute and try again.',
+      });
+    }
+
+    const { email } = req.body;
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ success: false, error: 'Email address is required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ success: false, error: 'Please provide a valid email address.' });
+    }
+
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Auth service unavailable.' });
+    }
+
+    const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`;
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo });
+
+    if (error) {
+      console.error('Forgot password Supabase error:', error.message);
+      // Return a generic success to prevent email enumeration
+    }
+
+    // Always return success to prevent user email enumeration
+    res.json({
+      success: true,
+      message: 'If an account with that email exists, a password reset link has been sent.',
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Auto-confirm user endpoint (used by client signup)
 app.post('/api/auth/auto-confirm', async (req, res) => {
   try {
