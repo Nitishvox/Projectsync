@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectSync</title>
+    <meta name="description" content="Collaborative project management dashboard with Supabase backend and AI Copilot agent" />
+    <meta property="og:title" content="ProjectSync" />
+    <meta property="og:description" content="Collaborative project management dashboard with Supabase backend and AI Copilot agent" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      // Gracefully handle Vite dev HMR websocket closure in sandboxed container preview
+      window.addEventListener('unhandledrejection', function (event) {
+        var msg = (event && event.reason && (event.reason.message || event.reason.toString())) || '';
+        if (msg.includes('WebSocket') || msg.includes('websocket')) {
+          event.preventDefault();
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

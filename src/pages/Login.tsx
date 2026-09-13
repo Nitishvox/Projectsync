@@ -1,0 +1,138 @@
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { Loader2 } from 'lucide-react';
+import { ThemeToggle } from '../components/ThemeToggle';
+
+const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+type LoginForm = z.infer<typeof loginSchema>;
+
+export default function Login() {
+  const { login, loginWithGuest } = useAuth();
+  const navigate = useNavigate();
+  const [error, setError] = React.useState('');
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+  });
+
+  const onSubmit = async (data: LoginForm) => {
+    try {
+      setError('');
+      const res = await login(data.email, data.password);
+      if (res.success) {
+        navigate('/');
+      } else {
+        setError(res.error || 'Invalid email or password');
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during login');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative transition-colors duration-200">
+      {/* Top right theme toggle */}
+      <div className="absolute top-6 right-6">
+        <ThemeToggle showLabel={true} />
+      </div>
+
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+          Sign in to your account
+        </h2>
+        <p className="mt-2 text-center text-sm text-gray-600 dark:text-slate-400">
+          Access your projects, deliverables, and Momentum Copilot
+        </p>
+      </div>
+
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white dark:bg-slate-900 py-8 px-4 shadow-lg sm:rounded-xl sm:px-10 border border-gray-100 dark:border-slate-800">
+          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+            {error && (
+              <div className="bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 p-3 rounded-md text-sm border border-red-100 dark:border-red-900">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">Email address</label>
+              <div className="mt-1">
+                <input
+                  {...register('email')}
+                  type="email"
+                  placeholder="you@company.com"
+                  className="block w-full appearance-none rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:text-sm"
+                />
+                {errors.email && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email.message}</p>}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">Password</label>
+              <div className="mt-1">
+                <input
+                  {...register('password')}
+                  type="password"
+                  placeholder="••••••••"
+                  className="block w-full appearance-none rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:text-sm"
+                />
+                {errors.password && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.password.message}</p>}
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex w-full justify-center rounded-lg border border-transparent bg-blue-600 py-2.5 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in'}
+              </button>
+            </div>
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200 dark:border-slate-800" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white dark:bg-slate-900 px-2 text-gray-500 dark:text-slate-400">Quick Access</span>
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={async () => {
+                  await loginWithGuest();
+                  navigate('/');
+                }}
+                className="flex w-full justify-center rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 py-2.5 px-4 text-sm font-medium text-gray-700 dark:text-slate-300 shadow-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                Continue as Guest / Instant Access
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-6 text-center text-sm">
+            <span className="text-gray-600 dark:text-slate-400">Don't have an account? </span>
+            <Link to="/register" className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300">
+              Sign up
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
