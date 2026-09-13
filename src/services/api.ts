@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import { Project, Task, DashboardStats } from '../types';
 
 export type { Project, Task, DashboardStats };
@@ -17,8 +17,8 @@ axiosClient.interceptors.request.use((config) => {
 });
 
 export const api = {
-  get: async (url: string) => {
-    return axiosClient.get(url);
+  get: async (url: string, config?: AxiosRequestConfig) => {
+    return axiosClient.get(url, config);
   },
   post: async (url: string, data?: any) => {
     return axiosClient.post(url, data);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { startTransition, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -69,6 +69,8 @@ export default function Tasks() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const requestId = useRef(0);
+  const searchController = useRef<AbortController | null>(null);
 
   const { success, error: toastError } = useToast();
 
@@ -98,13 +100,18 @@ export default function Tasks() {
   }, [searchInput]);
 
   const fetchData = async () => {
+    const currentRequest = ++requestId.current;
+    searchController.current?.abort();
+    const controller = new AbortController();
+
     try {
       setLoading(true);
+      searchController.current = controller;
 
       // Fetch projects for dropdown
-      const projRes = await api.get('/projects');
-      if (projRes.data.success) {
-        setProjects(projRes.data.data);
+      const projRes = await api.get('/projects', { signal: controller.signal });
+      if (currentRequest === requestId.current && projRes.data.success) {
+        startTransition(() => setProjects(projRes.data.data));
       }
 
       // Fetch tasks with real combined AND filters
@@ -114,14 +121,18 @@ export default function Tasks() {
       if (priorityFilter && priorityFilter !== 'ALL') params.append('priority', priorityFilter);
       if (selectedProjectId && selectedProjectId !== 'ALL') params.append('projectId', selectedProjectId);
 
-      const taskRes = await api.get(`/tasks?${params.toString()}`);
-      if (taskRes.data.success) {
-        setTasks(taskRes.data.data);
+      const taskRes = await api.get(`/tasks?${params.toString()}`, { signal: controller.signal });
+      if (currentRequest === requestId.current && taskRes.data.success) {
+        startTransition(() => setTasks(taskRes.data.data));
       }
     } catch (err: any) {
-      console.error('Failed to load tasks', err);
+      if (err?.code !== 'ERR_CANCELED') {
+        console.error('Failed to load tasks', err);
+      }
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -130,7 +141,11 @@ export default function Tasks() {
 
     const handleCopilotAction = () => fetchData();
     window.addEventListener('copilot-action', handleCopilotAction);
-    return () => window.removeEventListener('copilot-action', handleCopilotAction);
+    return () => {
+      requestId.current += 1;
+      searchController.current?.abort();
+      window.removeEventListener('copilot-action', handleCopilotAction);
+    };
   }, [debouncedSearch, statusFilter, priorityFilter, selectedProjectId]);
 
   const openCreateModal = () => {
@@ -268,11 +283,10 @@ export default function Tasks() {
                 <button
                   key={st}
                   onClick={() => setStatusFilter(st)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer border ${
-                    active
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                      : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 border-gray-200 dark:border-slate-800'
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer border ${active
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                    : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 border-gray-200 dark:border-slate-800'
+                    }`}
                 >
                   {labels[st]}
                 </button>
@@ -392,9 +406,8 @@ export default function Tasks() {
             return (
               <div
                 key={task.id}
-                className={`p-4 hover:bg-gray-50/70 dark:hover:bg-slate-800/50 transition-colors flex items-start gap-3.5 group ${
-                  isDone ? 'bg-gray-50/40 dark:bg-slate-800/30 opacity-75' : ''
-                }`}
+                className={`p-4 hover:bg-gray-50/70 dark:hover:bg-slate-800/50 transition-colors flex items-start gap-3.5 group ${isDone ? 'bg-gray-50/40 dark:bg-slate-800/30 opacity-75' : ''
+                  }`}
               >
                 {/* Complete Checkbox */}
                 <button
@@ -413,9 +426,8 @@ export default function Tasks() {
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <span
-                      className={`text-sm font-semibold tracking-tight ${
-                        isDone ? 'line-through text-gray-400 dark:text-slate-500' : 'text-gray-900 dark:text-white'
-                      }`}
+                      className={`text-sm font-semibold tracking-tight ${isDone ? 'line-through text-gray-400 dark:text-slate-500' : 'text-gray-900 dark:text-white'
+                        }`}
                     >
                       {task.name}
                     </span>
@@ -447,9 +459,8 @@ export default function Tasks() {
 
                     {task.dueDate && (
                       <span
-                        className={`inline-flex items-center gap-1 ${
-                          isOverdue ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-gray-500 dark:text-slate-400'
-                        }`}
+                        className={`inline-flex items-center gap-1 ${isOverdue ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-gray-500 dark:text-slate-400'
+                          }`}
                       >
                         <Clock className="w-3.5 h-3.5" />
                         {isOverdue && 'Overdue: '}

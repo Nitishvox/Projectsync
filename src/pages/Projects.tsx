@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { startTransition, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -68,6 +68,8 @@ export default function Projects() {
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const requestId = useRef(0);
+  const searchController = useRef<AbortController | null>(null);
 
   const { success, error: toastError } = useToast();
 
@@ -91,20 +93,28 @@ export default function Projects() {
   }, [searchInput]);
 
   const fetchProjects = async () => {
+    const currentRequest = ++requestId.current;
+    searchController.current?.abort();
+    const controller = new AbortController();
+
     try {
       setLoading(true);
       const params = new URLSearchParams();
       if (debouncedSearch.trim()) params.append('search', debouncedSearch.trim());
       if (statusFilter && statusFilter !== 'ALL') params.append('status', statusFilter);
 
-      const response = await api.get(`/projects?${params.toString()}`);
-      if (response.data.success) {
-        setProjects(response.data.data);
+      const response = await api.get(`/projects?${params.toString()}`, { signal: controller.signal });
+      if (currentRequest === requestId.current && response.data.success) {
+        startTransition(() => setProjects(response.data.data));
       }
     } catch (err: any) {
-      console.error('Failed to fetch projects', err);
+      if (err?.code !== 'ERR_CANCELED') {
+        console.error('Failed to fetch projects', err);
+      }
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -113,7 +123,11 @@ export default function Projects() {
 
     const handleCopilotAction = () => fetchProjects();
     window.addEventListener('copilot-action', handleCopilotAction);
-    return () => window.removeEventListener('copilot-action', handleCopilotAction);
+    return () => {
+      requestId.current += 1;
+      searchController.current?.abort();
+      window.removeEventListener('copilot-action', handleCopilotAction);
+    };
   }, [debouncedSearch, statusFilter]);
 
   const openCreateModal = () => {
@@ -264,11 +278,10 @@ export default function Projects() {
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer border ${
-                  active
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                    : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 border-gray-200 dark:border-slate-800'
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer border ${active
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                  : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 border-gray-200 dark:border-slate-800'
+                  }`}
               >
                 {labels[st]}
               </button>
