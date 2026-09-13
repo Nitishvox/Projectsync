@@ -174,7 +174,8 @@ export default function Projects() {
         }
       }
     } catch (err: any) {
-      const msg = err.response?.data?.error || 'Failed to save project';
+      const rawMsg = err.response?.data?.error || err.message || 'Failed to save project';
+      const msg = typeof rawMsg === 'string' ? rawMsg : (rawMsg?.message || JSON.stringify(rawMsg));
       setActionError(msg);
       toastError(msg);
     }

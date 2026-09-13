@@ -87,7 +87,7 @@ async function getAuthenticatedUser(req: express.Request): Promise<Authenticated
   const token = authHeader.replace('Bearer ', '').trim();
   if (!token) return null;
 
-  // Handle open/guest token
+  // Handle open/guest token (legacy — kept for in-memory demo sessions only)
   if (token.startsWith('open-token')) {
     return {
       id: '4770d58d-70c9-4e61-af88-87f0b65be229',
@@ -102,6 +102,7 @@ async function getAuthenticatedUser(req: express.Request): Promise<Authenticated
       const { data: { user }, error } = await supabase.auth.getUser(token);
       if (!error && user) {
         let fullName = user.user_metadata?.full_name || '';
+        // Try to enrich with profile name from DB
         try {
           const { data: profile } = await supabase
             .from('profiles')
@@ -111,7 +112,7 @@ async function getAuthenticatedUser(req: express.Request): Promise<Authenticated
           if (profile?.full_name) {
             fullName = profile.full_name;
           }
-        } catch {}
+        } catch { /* profiles table might not exist yet */ }
 
         return {
           id: user.id,
@@ -119,18 +120,21 @@ async function getAuthenticatedUser(req: express.Request): Promise<Authenticated
           fullName: fullName || user.email?.split('@')[0] || 'Team Member',
         };
       }
+      if (error) {
+        console.warn('[Auth] Supabase JWT verification error:', error.message);
+      }
     } catch (e) {
-      console.warn('[Auth] Token verification fallback:', e);
+      console.warn('[Auth] Token verification exception:', e);
     }
+    // Supabase is configured but token was invalid — reject
+    return null;
   }
 
-  // Default fallback for development sessions
-  return {
-    id: '4770d58d-70c9-4e61-af88-87f0b65be229',
-    email: 'devtester99281@gmail.com',
-    fullName: 'Nitish Tester',
-  };
+  // Supabase not configured (no env vars): dev-only fallback
+  console.warn('[Auth] Supabase not configured — running in local-only mode. Token not verified.');
+  return null;
 }
+
 
 // -------------------------------------------------------------
 // Resilient In-Memory Fallback Data Store
@@ -544,18 +548,20 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       return res.status(503).json({ success: false, error: 'Auth service unavailable.' });
     }
 
-    const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`;
+    // Compute clean redirect URL using request origin or configured FRONTEND_URL
+    const clientOrigin = (req.body.redirectTo || req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/+$/, '');
+    const redirectTo = clientOrigin.endsWith('/reset-password') ? clientOrigin : `${clientOrigin}/reset-password`;
+
     const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo });
 
     if (error) {
       console.error('Forgot password Supabase error:', error.message);
-      // Return a generic success to prevent email enumeration
+      return res.status(400).json({ success: false, error: error.message });
     }
 
-    // Always return success to prevent user email enumeration
     res.json({
       success: true,
-      message: 'If an account with that email exists, a password reset link has been sent.',
+      message: 'Password reset link has been dispatched to your email address.',
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

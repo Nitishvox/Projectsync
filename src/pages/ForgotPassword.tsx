@@ -33,9 +33,15 @@ export default function ForgotPassword() {
       setServerMessage('');
       const cleanEmail = data.email.trim().toLowerCase();
 
+      const cleanOrigin = window.location.origin.replace(/\/+$/, '');
+      const redirectUrl = `${cleanOrigin}/reset-password`;
+
       // First attempt via server API
       try {
-        const response = await api.post('/auth/forgot-password', { email: cleanEmail });
+        const response = await api.post('/auth/forgot-password', {
+          email: cleanEmail,
+          redirectTo: redirectUrl,
+        });
         if (response.data.success) {
           setSubmittedEmail(cleanEmail);
           setServerMessage(response.data.message || 'Password reset email sent successfully!');
@@ -47,7 +53,7 @@ export default function ForgotPassword() {
 
       // Fallback: direct Supabase Client reset password
       const { error: resetErr } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: redirectUrl,
       });
 
       if (resetErr) {

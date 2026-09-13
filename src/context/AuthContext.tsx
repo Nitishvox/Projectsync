@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../services/supabaseClient';
 import api from '../services/api';
 
+
 export interface User {
   id: string;
   fullName: string;
@@ -33,57 +34,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Sync profile from public.profiles table (mandated by schema)
+  // Sync profile via Express backend (avoids direct Supabase REST table calls)
   const syncProfile = async (authUser: { id: string; email?: string; user_metadata?: any }) => {
     try {
-      let fullName = authUser.user_metadata?.full_name || '';
-      
-      // Query public.profiles directly
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('full_name, email')
-        .eq('id', authUser.id)
-        .maybeSingle();
-
-      if (profile && profile.full_name) {
-        fullName = profile.full_name;
-      } else {
-        // If profile doesn't exist yet, attempt to upsert it
-        if (!fullName && authUser.email) {
-          fullName = authUser.email.split('@')[0];
-        }
-        try {
-          await supabase.from('profiles').upsert({
-            id: authUser.id,
-            full_name: fullName,
-            email: authUser.email || '',
-          });
-        } catch {
-          // Ignore if table not created yet
-        }
+      // Use the Express /api/auth/profile endpoint which handles profile lookup server-side
+      const response = await api.get('/auth/profile');
+      if (response.data?.success && response.data?.data) {
+        const pd = response.data.data;
+        const updatedUser: User = {
+          id: authUser.id,
+          email: pd.email || authUser.email || '',
+          fullName: pd.fullName || authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Team Member',
+        };
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        return updatedUser;
       }
-
-      const updatedUser: User = {
-        id: authUser.id,
-        email: authUser.email || '',
-        fullName: fullName || 'Team Member',
-      };
-
-      setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      return updatedUser;
-    } catch (e) {
-      console.warn('Profile fetch warning:', e);
-      const fallbackUser: User = {
-        id: authUser.id,
-        email: authUser.email || '',
-        fullName: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Team Member',
-      };
-      setUser(fallbackUser);
-      localStorage.setItem('user', JSON.stringify(fallbackUser));
-      return fallbackUser;
+    } catch {
+      // API call failed (server not running or auth error) — fall through to metadata
     }
+
+    // Fallback: use data from the Supabase auth session itself
+    const fallbackUser: User = {
+      id: authUser.id,
+      email: authUser.email || '',
+      fullName: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Team Member',
+    };
+    setUser(fallbackUser);
+    localStorage.setItem('user', JSON.stringify(fallbackUser));
+    return fallbackUser;
   };
+
 
   useEffect(() => {
     let mounted = true;

@@ -25,9 +25,16 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info') => {
+  const showToast = useCallback((message: any, type: ToastType = 'info') => {
+    let text = message;
+    if (typeof message === 'object' && message !== null) {
+      text = message.message || message.error || JSON.stringify(message);
+    } else if (typeof message !== 'string') {
+      text = String(message || 'Notification');
+    }
+
     const id = 'toast-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message: text, type }]);
 
     setTimeout(() => {
       removeToast(id);

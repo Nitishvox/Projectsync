@@ -194,7 +194,8 @@ export default function Tasks() {
         }
       }
     } catch (err: any) {
-      const msg = err.response?.data?.error || 'Failed to save deliverable';
+      const rawMsg = err.response?.data?.error || err.message || 'Failed to save deliverable';
+      const msg = typeof rawMsg === 'string' ? rawMsg : (rawMsg?.message || JSON.stringify(rawMsg));
       setActionError(msg);
       toastError(msg);
     }
