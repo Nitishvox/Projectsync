@@ -4,7 +4,6 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import Groq from 'groq-sdk';
 
@@ -2106,6 +2105,7 @@ Be concise, proactive, and clear.`,
 // -------------------------------------------------------------
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -2127,4 +2127,9 @@ async function startServer() {
   });
 }
 
-startServer();
+export default app;
+
+// Only start the server listener when run directly or locally, not in Vercel serverless environment
+if (process.env.VERCEL !== '1' && !process.env.NOW_REGION) {
+  startServer();
+}

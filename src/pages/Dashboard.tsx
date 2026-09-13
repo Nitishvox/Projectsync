@@ -102,7 +102,9 @@ export default function Dashboard() {
         fetchDashboardData();
       }
     } catch (err: any) {
-      toastError(err.response?.data?.error || 'Failed to create project');
+      const rawMsg = err.response?.data?.error || err.message || 'Failed to create project';
+      const msg = typeof rawMsg === 'string' ? rawMsg : (rawMsg?.message || JSON.stringify(rawMsg));
+      toastError(msg);
     } finally {
       setProjectSubmitting(false);
     }
@@ -127,7 +129,9 @@ export default function Dashboard() {
         fetchDashboardData();
       }
     } catch (err: any) {
-      toastError(err.response?.data?.error || 'Failed to create task');
+      const rawMsg = err.response?.data?.error || err.message || 'Failed to create task';
+      const msg = typeof rawMsg === 'string' ? rawMsg : (rawMsg?.message || JSON.stringify(rawMsg));
+      toastError(msg);
     } finally {
       setTaskSubmitting(false);
     }
