@@ -21,6 +21,23 @@ app.use(morgan('dev'));
 app.use(cors());
 app.use(express.json());
 
+// Normalize incoming API requests on Vercel or proxies where /api prefix might be stripped
+app.use((req, res, next) => {
+  if (!req.url.startsWith('/api') && (
+    req.url.startsWith('/projects') ||
+    req.url.startsWith('/tasks') ||
+    req.url.startsWith('/dashboard') ||
+    req.url.startsWith('/auth') ||
+    req.url.startsWith('/health') ||
+    req.url.startsWith('/audit-logs') ||
+    req.url.startsWith('/copilot') ||
+    req.url.startsWith('/seed')
+  )) {
+    req.url = '/api' + req.url;
+  }
+  next();
+});
+
 // -------------------------------------------------------------
 // Supabase Client Initialization (Admin / Server)
 // -------------------------------------------------------------
